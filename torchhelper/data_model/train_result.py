@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from ..trainer_base import DataTensorLike, ScoreLike
+from .data_aliases import DataTensorLike, ScoreLike
 
 
 @dataclass

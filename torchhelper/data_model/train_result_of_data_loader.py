@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from .data_aliases import NumericScore, Score
+from .data_aliases import NumericScore
 
 
 @dataclass
 class TrainResultOfDataLoader:
     data_count: int
     loss: NumericScore
-    score: Optional[Score]
+    score: Optional[NumericScore]

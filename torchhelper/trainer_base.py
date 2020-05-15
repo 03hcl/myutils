@@ -17,7 +17,7 @@ from .. import ConfigBase, UtilLogger
 from ..visualizer import visualize_loss
 
 from .device import Device
-from .data_model import DataLoaderLike, DatasetLike, DataTensorLike, NumericScore, Score, ScoreDict, ScoreLike, \
+from .data_model import DataLoaderLike, DatasetLike, DataTensorLike, NumericScore, Score, ScoreLike, \
     EpochResult, TrainLog, TrainResult, TrainResultOfDataLoader
 from .model_set import create_model_set, load_interim_model_set, ModelSet
 
@@ -46,8 +46,7 @@ class TrainerBase:
     # noinspection PyUnusedLocal
     @classmethod
     def score_for_each_iteration(cls, model_set: ModelSet, data: DataTensorLike, train_result: TrainResult,
-                                 *, logger: UtilLogger, **kwargs) \
-            -> Optional[ScoreLike]:
+                                 *, logger: UtilLogger, **kwargs) -> Optional[ScoreLike]:
         return None
 
     # noinspection PyUnusedLocal
@@ -55,8 +54,10 @@ class TrainerBase:
     def output_progress(cls, config: ConfigBase, epoch: int, model_set: ModelSet,
                         epoch_result_dict: Dict[str, EpochResult], train_keys: Tuple[str],
                         *, logger: UtilLogger, **kwargs) -> None:
+        score: Optional[float] = calculate_score_sum(train_keys, epoch_result_dict)
         log_prefix: str = "" if score is None else "[Score = {:10.6f}]".format(score)
-        logger.snap_epoch_with_loss(loss, epoch, config.train.number_of_epochs, pre_epoch=config.train.pre_epoch or 0,
+        logger.snap_epoch_with_loss(calculate_loss_sum(train_keys, epoch_result_dict),
+                                    epoch, config.train.number_of_epochs, pre_epoch=config.train.pre_epoch or 0,
                                     log_prefix=log_prefix)
 
     @classmethod
@@ -127,13 +128,13 @@ class TrainerBase:
                                                  trial=trial)
 
             if config.train.optuna_pruner is not None and trial is not None:
-                loss_sum: float = _calculate_loss_sum(train_keys, result_dict)
+                loss_sum: float = calculate_loss_sum(train_keys, result_dict)
                 trial.report(loss_sum, epoch + 1)
                 if trial.should_prune(epoch + 1):
                     logger.info("epoch = {:>5},    loss = {:>10.6f},    [Pruned]".format(epoch + 1, loss_sum))
                     raise TrialPruned
 
-        return TrainLog(tuple(data_loader_dict.keys()), loss_array, _calculate_loss_sum(train_keys, result_dict))
+        return TrainLog(tuple(data_loader_dict.keys()), loss_array, calculate_loss_sum(train_keys, result_dict))
 
     @classmethod
     def _train_for_each_data_loader(cls, model_set: ModelSet, data_loader: DataLoader,
@@ -316,7 +317,17 @@ def get_data_length(data: Any) -> int:
     return tensor.shape[0]
 
 
-def _calculate_loss_sum(train_keys: Tuple[str], epoch_result_dict: Dict[str, EpochResult]) -> float:
+def calculate_loss_sum(train_keys: Tuple[str], epoch_result_dict: Dict[str, EpochResult]) -> float:
     data_sum: int = sum(result.data_count for key, result in epoch_result_dict.items() if key in train_keys)
     loss_sum: float = sum(result.loss for key, result in epoch_result_dict.items() if key in train_keys)
     return loss_sum / data_sum if data_sum > 0 else 0
+
+
+def calculate_score_sum(train_keys: Tuple[str], epoch_result_dict: Dict[str, EpochResult]) -> Optional[float]:
+    # noinspection PyPep8
+    data_sum: int = sum(result.data_count for key, result in epoch_result_dict.items()
+                        if ((key in train_keys) and (result.score != None)))
+    # noinspection PyPep8
+    score_sum: float = sum(result.loss for key, result in epoch_result_dict.items()
+                           if ((key in train_keys) and (result.score != None)))
+    return score_sum / data_sum if data_sum > 0 else None

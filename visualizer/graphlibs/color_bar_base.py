@@ -1,5 +1,4 @@
 from abc import abstractmethod
-from enum import auto, Enum, unique
 from typing import Optional, Tuple
 
 from .graph_base import GraphBase
