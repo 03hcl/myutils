@@ -1,0 +1,15 @@
+.idea/
+data/
+interim/
+log/
+results/
+
+utils/
+
+__pycache__/
+*.py___jb_tmp___
+
+*.py[cod]
+*$py.class
+
+MANIFEST
