@@ -6,10 +6,10 @@ from torch.utils.data import DataLoader
 
 from .. import ConfigBase, UtilLogger
 
+from .both_phase_base import create_data_loader_dict, create_key_str, get_data_length
 from .data_model import DataLoaderLike, DatasetLike, DataTensorLike
 from .device import Device
 from .model_set import load_result_model_set, ModelSet
-from .trainer_base import create_data_loader_dict, create_key_str, get_data_length
 
 
 class PredictorBase:

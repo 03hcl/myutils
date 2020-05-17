@@ -1,7 +1,7 @@
 from logging import Logger
 import os
 import shutil
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 
@@ -16,9 +16,11 @@ from torch.utils.data import DataLoader
 from .. import ConfigBase, UtilLogger
 from ..visualizer import visualize_loss
 
+from .both_phase_base import create_data_loader_dict, create_key_str, get_data_length
 from .device import Device
 from .data_model import DataLoaderLike, DatasetLike, DataTensorLike, NumericScore, Score, ScoreLike, \
-    EpochResult, TrainLog, TrainResult, TrainResultOfDataLoader
+    EpochResult, TrainLog, TrainResult, TrainResultOfDataLoader, \
+    TRAIN_KEY_STR, VALIDATION_KEY_STR
 from .model_set import create_model_set, load_interim_model_set, ModelSet
 
 
@@ -53,29 +55,36 @@ class TrainerBase:
     @classmethod
     def output_progress(cls, config: ConfigBase, epoch: int, model_set: ModelSet,
                         epoch_result_dict: Dict[str, EpochResult], train_keys: Tuple[str],
+                        loss_array: np.ndarray, visualizes_loss_on_logscale: bool = False,
                         *, logger: UtilLogger, **kwargs) -> None:
         score: Optional[float] = calculate_score_sum(train_keys, epoch_result_dict)
         log_prefix: str = "" if score is None else "[Score = {:10.6f}]".format(score)
         logger.snap_epoch_with_loss(calculate_loss_sum(train_keys, epoch_result_dict),
                                     epoch, config.train.number_of_epochs, pre_epoch=config.train.pre_epoch or 0,
                                     log_prefix=log_prefix)
+        visualize_loss(loss_array, tuple(epoch_result_dict.keys()),
+                       file_name="loss" + config.get_epoch_str_function(epoch),
+                       pre_epoch=config.train.pre_epoch, directory=config.interim_directory,
+                       is_logscale=visualizes_loss_on_logscale)
 
     @classmethod
     def train(cls, config: ConfigBase, model_set: ModelSet,
               train_dataset: DatasetLike, validation_dataset: Optional[DatasetLike],
+              visualizes_loss_on_logscale: bool = False,
               *, logger: UtilLogger, trial: Optional[Trial] = None, **kwargs) -> TrainLog:
 
         pre_epoch: int = config.train.pre_epoch or 0
 
         data_loader_like: DataLoaderLike = \
             cls.create_data_loader(config=config, dataset=train_dataset, logger=logger, **kwargs)
-        data_loader_dict: Dict[str, DataLoader] = create_data_loader_dict(data_loader_like, create_key_str("train"))
+        data_loader_dict: Dict[str, DataLoader] = \
+            create_data_loader_dict(data_loader_like, create_key_str(TRAIN_KEY_STR))
         train_keys: Tuple[str] = tuple(data_loader_dict.keys())
 
         if validation_dataset is not None:
             data_loader_like = \
                 cls.create_data_loader(config=config, dataset=validation_dataset, logger=logger, **kwargs)
-            data_loader_dict.update(create_data_loader_dict(data_loader_like, create_key_str("val")))
+            data_loader_dict.update(create_data_loader_dict(data_loader_like, create_key_str(VALIDATION_KEY_STR)))
 
         data_loader_length: int = len(data_loader_dict)
 
@@ -119,9 +128,11 @@ class TrainerBase:
             if is_output_progress:
                 loss_array[loss_index, :] = [epoch + 1, *(e.loss for e in result_dict.values())]
                 loss_index += 1
-                cls.output_progress(config=config, epoch=epoch + 1,
-                                    model_set=model_set, epoch_result_dict=result_dict, train_keys=train_keys,
-                                    logger=logger, **kwargs)
+                cls.output_progress(
+                    config=config, epoch=epoch + 1,
+                    model_set=model_set, epoch_result_dict=result_dict, train_keys=train_keys,
+                    loss_array=loss_array[: loss_index], visualizes_loss_on_logscale=visualizes_loss_on_logscale,
+                    logger=logger, **kwargs)
 
             if config.train.temporary_save_epoch > 0 and (epoch + 1) % config.train.temporary_save_epoch == 0:
                 logger.save_loss_array_and_model(config, epoch + 1, loss_array[0: loss_index, :], model_set.model,
@@ -278,45 +289,6 @@ class TrainerBase:
         util_logger.close()
 
 
-def create_data_loader_dict(data_loader_like: DataLoaderLike, key_str_func: Callable[[str], str]) \
-        -> Dict[str, DataLoader]:
-    data_loader_dict: Dict[str, DataLoader] = dict()
-    if issubclass(type(data_loader_like), DataLoader):
-        data_loader_dict[key_str_func("")] = data_loader_like
-    elif issubclass(type(data_loader_like), tuple) or issubclass(type(data_loader_like), list) \
-            or issubclass(type(data_loader_like), set):
-        for key, value in enumerate(data_loader_like):
-            data_loader_dict[key_str_func(str(key))] = value
-    elif issubclass(type(data_loader_like), dict):
-        for key, value in data_loader_like.items():
-            data_loader_dict[key_str_func(key)] = value
-    else:
-        raise TypeError
-    return data_loader_dict
-
-
-def create_key_str(base: str) -> Callable[[str], str]:
-    return lambda key: base + (" ({})".format(key) if key else "")
-
-
-def get_data_length(data: Any) -> int:
-
-    if issubclass(type(data), dict):
-        return len(next(iter(data.values())))
-
-    # noinspection PyUnusedLocal
-    tensor: torch.Tensor
-
-    if issubclass(type(data), torch.Tensor):
-        tensor = data
-    elif issubclass(type(data), tuple) or issubclass(type(data), list) or issubclass(type(data), set):
-        tensor = data[0]
-    else:
-        raise TypeError
-
-    return tensor.shape[0]
-
-
 def calculate_loss_sum(train_keys: Tuple[str], epoch_result_dict: Dict[str, EpochResult]) -> float:
     data_sum: int = sum(result.data_count for key, result in epoch_result_dict.items() if key in train_keys)
     loss_sum: float = sum(result.loss for key, result in epoch_result_dict.items() if key in train_keys)
@@ -324,10 +296,8 @@ def calculate_loss_sum(train_keys: Tuple[str], epoch_result_dict: Dict[str, Epoc
 
 
 def calculate_score_sum(train_keys: Tuple[str], epoch_result_dict: Dict[str, EpochResult]) -> Optional[float]:
-    # noinspection PyPep8
     data_sum: int = sum(result.data_count for key, result in epoch_result_dict.items()
-                        if ((key in train_keys) and (result.score != None)))
-    # noinspection PyPep8
+                        if ((key in train_keys) and (result.score is not None)))
     score_sum: float = sum(result.loss for key, result in epoch_result_dict.items()
-                           if ((key in train_keys) and (result.score != None)))
+                           if ((key in train_keys) and (result.score is not None)))
     return score_sum / data_sum if data_sum > 0 else None
