@@ -230,9 +230,11 @@ class TrainerBase:
                 model_set = load_interim_model_set(config=config, device=device, trial=trial, logger=util_logger)
 
             try:
-                train_log: TrainLog = cls.train(config=config, model_set=model_set,
-                                                train_dataset=train_dataset, validation_dataset=validation_dataset,
-                                                trial=trial, logger=util_logger, **kwargs)
+                train_log: TrainLog = cls.train(
+                    config=config, model_set=model_set,
+                    train_dataset=train_dataset, validation_dataset=validation_dataset,
+                    visualizes_loss_on_logscale=visualizes_loss_on_logscale,
+                    trial=trial, logger=util_logger, **kwargs)
             except TrialPruned as e:
                 util_logger.info("訓練が途中で打ち切られました。")
                 raise e
