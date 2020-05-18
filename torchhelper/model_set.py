@@ -19,6 +19,7 @@ class ModelSet:
     def __init__(self, model: nn.Module, criterion: nn.Module, optimizer: Optimizer, device: Device):
         if device.is_gpu:
             model = model.to(device=device.torch_device)
+            # criterion = criterion.to(device=device.torch_device)
         self.model: nn.Module = model
         self.criterion: nn.Module = criterion
         self.optimizer: Optimizer = optimizer

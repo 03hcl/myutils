@@ -292,14 +292,16 @@ class TrainerBase:
 
 
 def calculate_loss_sum(train_keys: Tuple[str], epoch_result_dict: Dict[str, EpochResult]) -> float:
-    data_sum: int = sum(result.data_count for key, result in epoch_result_dict.items() if key in train_keys)
-    loss_sum: float = sum(result.loss for key, result in epoch_result_dict.items() if key in train_keys)
+    data_sum: int = sum(result.data_count for key, result in epoch_result_dict.items()
+                        if key in train_keys)
+    loss_sum: float = sum(result.loss * result.data_count for key, result in epoch_result_dict.items()
+                          if key in train_keys)
     return loss_sum / data_sum if data_sum > 0 else 0
 
 
 def calculate_score_sum(train_keys: Tuple[str], epoch_result_dict: Dict[str, EpochResult]) -> Optional[float]:
     data_sum: int = sum(result.data_count for key, result in epoch_result_dict.items()
                         if ((key in train_keys) and (result.score is not None)))
-    score_sum: float = sum(result.loss for key, result in epoch_result_dict.items()
+    score_sum: float = sum(result.score * result.data_count for key, result in epoch_result_dict.items()
                            if ((key in train_keys) and (result.score is not None)))
     return score_sum / data_sum if data_sum > 0 else None
