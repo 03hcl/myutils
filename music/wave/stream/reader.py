@@ -24,7 +24,7 @@ class Reader(WaveIOBase, io.BufferedReader):
     def read(self, size: Optional[int] = None) -> Tuple[np.ndarray, bytes]:
 
         size = self._get_size(size)
-        if self.wave_format.format_code == FormatTag.ieee_float:
+        if self.wave_format.format_code == FormatTag.ieee_float or self.wave_format.format_code == FormatTag.pcm:
             data_array = np.empty([size, self.wave_format.number_of_channels], dtype="<f4")
         else:
             raise NotImplementedError
@@ -41,7 +41,7 @@ class Reader(WaveIOBase, io.BufferedReader):
 
     def read1(self, size: Optional[int] = None, head_buffer: bytes = b"") -> Tuple[np.ndarray, bytes]:
 
-        sample_size: int = self.wave_format.number_of_channels * (self.wave_format.bits_per_sample // 8)
+        sample_size: int = self.wave_format.number_of_channels * self.wave_format.bytes_per_sample
         size = self._get_size(size)
         self._raise_position_error()
 
@@ -56,11 +56,24 @@ class Reader(WaveIOBase, io.BufferedReader):
             end_buffer = data[-(len(data) % sample_size):]
             data = data[: -(len(data) % sample_size)]
 
+        # noinspection PyUnusedLocal
+        data_array: np.ndarray
+
         if self.wave_format.format_code == FormatTag.ieee_float:
-            data_array: np.ndarray = np.frombuffer(data, dtype="<f4")
-            return np.reshape(data_array, [size, self.wave_format.number_of_channels]), end_buffer
+            data_array = np.frombuffer(data, dtype="<f4")
+        elif self.wave_format.format_code == FormatTag.pcm:
+            if self.wave_format.bits_per_sample == 8:
+                data_array = np.frombuffer(data, dtype="u1")
+                data_array = (data_array.astype(dtype="<f4") - 128) / 128
+            elif self.wave_format.bits_per_sample == 16:
+                data_array = np.frombuffer(data, dtype="<i2")
+                data_array = data_array.astype(dtype="<f4") / 32768
+            else:
+                raise NotImplementedError
         else:
             raise NotImplementedError
+
+        return np.reshape(data_array, [size, self.wave_format.number_of_channels]), end_buffer
 
     # endregion
 
@@ -183,7 +196,7 @@ class Reader(WaveIOBase, io.BufferedReader):
             return size
         if not self.wave_format:
             raise IncorrectWaveFormatError("WaveFormat が読み込まれていないため、データの最大サイズがわかりません。")
-        sample_size: int = self.wave_format.number_of_channels * (self.wave_format.bits_per_sample // 8)
+        sample_size: int = self.wave_format.number_of_channels * self.wave_format.bytes_per_sample
         return self.data_size // sample_size
 
     def _read_chunk_header(self) -> (str, int):

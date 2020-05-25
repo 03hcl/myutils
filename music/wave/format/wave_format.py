@@ -33,6 +33,10 @@ class WaveFormat:
         pass
 
     @property
+    def bytes_per_sample(self):
+        pass
+
+    @property
     def number_of_valid_bits(self):
         pass
 
@@ -96,6 +100,10 @@ class WaveFormat:
     @bits_per_sample.getter
     def bits_per_sample(self) -> int:
         return self._w_bits_per_sample
+
+    @bytes_per_sample.getter
+    def bytes_per_sample(self) -> int:
+        return self.bits_per_sample // 8
 
     @bits_per_sample.setter
     def bits_per_sample(self, value: int):

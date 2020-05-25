@@ -8,4 +8,5 @@ import numpy as np
 class TrainLog:
     data_keys: Tuple[str, ...]
     loss_array: np.ndarray
+    score_array: np.ndarray
     score: float

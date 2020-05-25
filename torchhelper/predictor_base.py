@@ -97,7 +97,7 @@ class PredictorBase:
         output: Dict[str, DataTensorLike] = \
             cls.predict(config=config, model_set=model_set,
                         test_dataset=test_dataset, validation_dataset=validation_dataset, logger=util_logger, **kwargs)
-        cls.run_append(config=config, model_set=model_set, dataset=test_dataset,
+        cls.run_append(config=config, model_set=model_set, dataset=test_dataset, validation_dataset=validation_dataset,
                        output=output, logger=util_logger, **kwargs)
 
         util_logger.close()
@@ -106,9 +106,9 @@ class PredictorBase:
 
     @classmethod
     def run_append(cls, config: ConfigBase, model_set: ModelSet,
-                   dataset: DatasetLike, output: Dict[str, DataTensorLike],
-                   *, device: Optional[Device] = None, logger: Optional[UtilLogger] = None) -> None:
-        raise NotImplementedError
+                   dataset: DatasetLike, validation_dataset: Optional[DatasetLike], output: Dict[str, DataTensorLike],
+                   *, device: Optional[Device] = None, logger: Optional[UtilLogger] = None, **kwargs) -> None:
+        pass
 
 
 def _concat_batch(base: DataTensorLike, appended: Union[DataTensorLike], data_length: int) -> DataTensorLike:

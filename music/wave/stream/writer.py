@@ -86,7 +86,7 @@ class Writer(WaveIOBase, io.BufferedWriter):
             fmt_chunk_size = 40 if wf.format_code == FormatTag.extensible else 18
             fact_chunk_size = len(wf.number_of_samples) * 4
 
-        data_byte_size: int = data_size * wf.number_of_channels * (wf.bits_per_sample // 8)
+        data_byte_size: int = data_size * wf.number_of_channels * wf.bytes_per_sample
         riff_chunk_size: int = 4 + (fmt_chunk_size + 8) + (fact_chunk_size + 8 if fact_chunk_size > 0 else 0) + (
                 data_byte_size + 8)
 

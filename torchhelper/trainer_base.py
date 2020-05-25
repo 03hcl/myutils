@@ -14,7 +14,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from .. import ConfigBase, UtilLogger
-from ..visualizer import visualize_loss
+from ..visualizer import visualize_loss, visualize_values_for_each_epoch
 
 from .both_phase_base import create_data_loader_dict, create_key_str, get_data_length
 from .device import Device
@@ -55,17 +55,21 @@ class TrainerBase:
     @classmethod
     def output_progress(cls, config: ConfigBase, epoch: int, model_set: ModelSet,
                         epoch_result_dict: Dict[str, EpochResult], train_keys: Tuple[str],
-                        loss_array: np.ndarray, visualizes_loss_on_logscale: bool = False,
-                        *, logger: UtilLogger, **kwargs) -> None:
+                        loss_array: np.ndarray, score_array: Optional[np.ndarray] = None,
+                        visualizes_loss_on_logscale: bool = False, *, logger: UtilLogger, **kwargs) -> None:
         score: Optional[float] = calculate_score_sum(train_keys, epoch_result_dict)
         log_prefix: str = "" if score is None else "[Score = {:10.6f}]".format(score)
         logger.snap_epoch_with_loss(calculate_loss_sum(train_keys, epoch_result_dict),
                                     epoch, config.train.number_of_epochs, pre_epoch=config.train.pre_epoch or 0,
                                     log_prefix=log_prefix)
         visualize_loss(loss_array, tuple(epoch_result_dict.keys()),
-                       file_name="loss" + config.get_epoch_str_function(epoch),
-                       pre_epoch=config.train.pre_epoch, directory=config.interim_directory,
-                       is_logscale=visualizes_loss_on_logscale)
+                       directory=config.interim_directory, file_name="loss" + config.get_epoch_str_function(epoch),
+                       pre_epoch=config.train.pre_epoch, is_logscale=visualizes_loss_on_logscale)
+        if score_array is not None:
+            visualize_values_for_each_epoch(
+                score_array, tuple(epoch_result_dict.keys()),
+                directory=config.interim_directory, file_name="score" + config.get_epoch_str_function(epoch),
+                pre_epoch=config.train.pre_epoch, y_axis_name="score", is_logscale=visualizes_loss_on_logscale)
 
     @classmethod
     def train(cls, config: ConfigBase, model_set: ModelSet,
@@ -92,6 +96,7 @@ class TrainerBase:
             int(config.train.number_of_epochs / config.train.progress_epoch) \
             - int(max(pre_epoch, config.train.warmup_progress_epoch) / config.train.progress_epoch)
         loss_array: np.ndarray = np.empty((loss_array_length, data_loader_length + 1))
+        score_array: np.ndarray = np.zeros((loss_array_length, data_loader_length + 1))
         loss_index: int = 0
 
         logger.time_meter.set_start_time()
@@ -109,6 +114,7 @@ class TrainerBase:
                 = config.train.progress_epoch > 0 \
                 and epoch >= config.train.warmup_progress_epoch \
                 and (epoch + 1) % config.train.progress_epoch == 0
+            has_score: bool = False
 
             # noinspection PyUnusedLocal
             key: str
@@ -123,15 +129,19 @@ class TrainerBase:
                     result.loss /= result.data_count
                 if issubclass(type(result.score), float):
                     result.score /= result.data_count
+                has_score |= result.score is not None
                 result_dict[key] = EpochResult(data_loader, result.data_count, result.loss, result.score)
 
             if is_output_progress:
                 loss_array[loss_index, :] = [epoch + 1, *(e.loss for e in result_dict.values())]
+                if has_score:
+                    score_array[loss_index, :] = [epoch + 1, *(e.score for e in result_dict.values())]
                 loss_index += 1
                 cls.output_progress(
                     config=config, epoch=epoch + 1,
                     model_set=model_set, epoch_result_dict=result_dict, train_keys=train_keys,
-                    loss_array=loss_array[: loss_index], visualizes_loss_on_logscale=visualizes_loss_on_logscale,
+                    loss_array=loss_array[: loss_index], score_array=score_array[: loss_index] if has_score else None,
+                    visualizes_loss_on_logscale=visualizes_loss_on_logscale,
                     logger=logger, **kwargs)
 
             if config.train.temporary_save_epoch > 0 and (epoch + 1) % config.train.temporary_save_epoch == 0:
@@ -145,7 +155,8 @@ class TrainerBase:
                     logger.info("epoch = {:>5},    loss = {:>10.6f},    [Pruned]".format(epoch + 1, loss_sum))
                     raise TrialPruned
 
-        return TrainLog(tuple(data_loader_dict.keys()), loss_array, calculate_loss_sum(train_keys, result_dict))
+        return TrainLog(tuple(data_loader_dict.keys()), loss_array, score_array,
+                        calculate_loss_sum(train_keys, result_dict))
 
     @classmethod
     def _train_for_each_data_loader(cls, model_set: ModelSet, data_loader: DataLoader,
@@ -242,7 +253,7 @@ class TrainerBase:
                 util_logger.warning("エラーが発生しました。")
                 util_logger.warning(str(e.args))
                 raise e
-            model_set.model.eval()
+            # model_set.model.eval()
 
             result_directory: str = config.result_directory
             if trial is not None:
@@ -256,9 +267,11 @@ class TrainerBase:
                        fmt="%.18e", delimiter=",")
             # logger_wrapper.save_loss_array_and_model(-1, loss_array, model_set.model,
             #                                          dir_path=config.result_directory)
-            visualize_loss(train_log.loss_array, train_log.data_keys,
-                           pre_epoch=config.train.pre_epoch, directory=result_directory,
-                           is_logscale=visualizes_loss_on_logscale)
+            visualize_loss(train_log.loss_array, train_log.data_keys, directory=result_directory,
+                           pre_epoch=config.train.pre_epoch, is_logscale=visualizes_loss_on_logscale)
+            cls.run_append(config=config, model_set=model_set, result_directory=result_directory,
+                           dataset=train_dataset, validation_dataset=validation_dataset, train_log=train_log,
+                           device=device, logger=logger)
 
             return train_log.score
 
@@ -289,6 +302,12 @@ class TrainerBase:
             objective()
 
         util_logger.close()
+
+    @classmethod
+    def run_append(cls, config: ConfigBase, model_set: ModelSet, result_directory: str,
+                   dataset: DatasetLike, validation_dataset: Optional[DatasetLike], train_log: TrainLog,
+                   *, device: Optional[Device] = None, logger: Optional[UtilLogger] = None, **kwargs) -> None:
+        pass
 
 
 def calculate_loss_sum(train_keys: Tuple[str], epoch_result_dict: Dict[str, EpochResult]) -> float:
