@@ -11,7 +11,7 @@ _figure = TypeVar("_figure", bound="Figure")
 class Figure(GraphBase):
 
     def __init__(self, *args: Any, **kwargs: Any):
-        self._init_args: Tuple[Any] = args
+        self._init_args: Tuple[Any, ...] = args
         self._init_kwargs: Dict[str, Any] = kwargs
         super(Figure, self).__init__(*args, **kwargs)
 

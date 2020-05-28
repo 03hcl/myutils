@@ -44,7 +44,7 @@ class TrainConfig:
     def __init__(self, batch_size: int, number_of_epochs: int, progress_epoch: int, temporary_save_epoch: int,
                  pre_epoch: Optional[int] = None, warmup_progress_epoch: int = 0,
                  optuna_number_of_trials: Optional[int] = None, optuna_pruner: Optional[BasePruner] = None,
-                 *args, **kwargs):
+                 optuna_pre_trials: int = 0, *args, **kwargs):
 
         self.batch_size: int = batch_size
         self.number_of_epochs: int = number_of_epochs
@@ -57,6 +57,7 @@ class TrainConfig:
 
         self.optuna_pruner: Optional[BasePruner] = optuna_pruner
         self.optuna_number_of_trials: Optional[int] = optuna_number_of_trials
+        self.optuna_pre_trials: int = optuna_pre_trials
 
 
 class ConfigBase:
@@ -78,6 +79,10 @@ class ConfigBase:
 
         self.model_file: FileName = FileName("model", "pth")
         self.loss_file: FileName = FileName("loss", "csv")
+        self.score_file: FileName = FileName("score", "csv")
+
+        self.optuna_score_file: FileName = FileName("optuna_score", "csv")
+        self.optuna_params_file: FileName = FileName("optuna_params", "json5")
 
         self.get_epoch_str_function: Callable[[int], str] \
             = lambda epoch: "(epoch={})".format(epoch) if epoch >= 0 else ""

@@ -1,3 +1,4 @@
+import json5
 import os
 from typing import Any, Dict, Optional
 
@@ -30,11 +31,11 @@ def create_model_set(config: ConfigBase, device: Device, *,
                      trial: Optional[Trial] = None, initial_model: nn.Module = None,
                      logger: Optional[UtilLogger] = None) -> ModelSet:
 
-    model_parameters: Dict[str, Any] = _suggest_parameters(config.model_set.model.parameters, trial, logger)
+    model_parameters: Dict[str, Any] = _suggest_parameters(config.model_set.model.parameters, trial, config, logger)
 
     model: nn.Module = initial_model or config.model_set.model.type(**model_parameters)
     criterion: nn.Module = config.model_set.criterion.type(
-        **_suggest_parameters(config.model_set.criterion.parameters, trial, logger))
+        **_suggest_parameters(config.model_set.criterion.parameters, trial, config, logger))
 
     if logger is not None:
         param_str: str = ""
@@ -48,15 +49,16 @@ def create_model_set(config: ConfigBase, device: Device, *,
     model_set = ModelSet(model, criterion,
                          config.model_set.optimizer.type(
                              params=model.parameters(),
-                             **_suggest_parameters(config.model_set.optimizer.parameters, trial, logger)),
+                             **_suggest_parameters(config.model_set.optimizer.parameters, trial, config, logger)),
                          device)
 
     return model_set
 
 
-def _suggest_parameters(parameters: Dict[str, Any], trial: Optional[Trial],
+def _suggest_parameters(parameters: Dict[str, Any], trial: Optional[Trial], config: ConfigBase,
                         logger: Optional[UtilLogger]) -> Dict[str, Any]:
     result: Dict[str, Any] = {}
+    params: Optional[Dict[str, Any]] = None
     for key, value in parameters.items():
         if not issubclass(type(value), OptunaParameter):
             result[key] = value
@@ -67,7 +69,13 @@ def _suggest_parameters(parameters: Dict[str, Any], trial: Optional[Trial],
                 logger.info("{} = {}".format(optuna_parameter.name, str(suggested_value)))
             result[key] = suggested_value
         else:
-            raise CouldNotSuggestOptunaParameterError
+            if params is None:
+                params_file_path: str = config.result_directory + os.sep + config.optuna_params_file.full_name
+                if not os.path.isfile(params_file_path):
+                    raise CouldNotSuggestOptunaParameterError
+                with open(params_file_path, "r") as f:
+                    params = json5.load(f)
+            result[key] = params[key]
     return result
 
 

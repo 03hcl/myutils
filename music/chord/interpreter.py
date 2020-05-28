@@ -213,28 +213,28 @@ class _Data(ConstSingleton):
             Notation.Advanced: (("(", ")"), ),
         }
 
-    TensionSeparatorDict: Dict[Notation, Tuple[str]] = \
+    TensionSeparatorDict: Dict[Notation, Tuple[str, ...]] = \
         {
             Notation.MIREX: (",", ),
             Notation.Standard: (",", ),
             Notation.Advanced: (",", ),
         }
 
-    RootSeparatorDict: Dict[Notation, Tuple[str]] = \
+    RootSeparatorDict: Dict[Notation, Tuple[str, ...]] = \
         {
             Notation.MIREX: (":", " ", "", ),
             Notation.Standard: ("", ":", " ", ),
             Notation.Advanced: ("", ":", " ", ),
         }
 
-    BassSeparatorDict: Dict[Notation, Tuple[str]] = \
+    BassSeparatorDict: Dict[Notation, Tuple[str, ...]] = \
         {
             Notation.MIREX: ("/", ),
             Notation.Standard: ("/", ),
             Notation.Advanced: ("/", ),
         }
 
-    NoneChordDict: Dict[Notation, Tuple[str]] = \
+    NoneChordDict: Dict[Notation, Tuple[str, ...]] = \
         {
             Notation.MIREX: ("N", ),
             Notation.Standard: ("N.C.", "N.C", ),

@@ -72,18 +72,21 @@ class UtilLogger:
 
         self.debug(log_str)
 
-    def save_loss_array_and_model(self, config: ConfigBase, epoch: int, loss_array: np.ndarray, model: nn.Module,
+    def save_loss_array_and_model(self, config: Optional[ConfigBase], epoch: int,
+                                  loss_array: np.ndarray, model: nn.Module,
                                   *, directory: str = None, log_str: str = None, trial: Optional[Trial] = None) -> None:
 
-        save_directory: str = (directory or self.interim_directory)
-        if trial is not None:
-            save_directory += os.sep + str(trial.number)
-        os.makedirs(save_directory, exist_ok=True)
+        if config is None:
+            directory = directory or self.interim_directory
+            if trial is not None:
+                directory += os.sep + str(trial.number + 1)
+            os.makedirs(directory, exist_ok=True)
+        else:
+            directory = config.interim_directory
 
         epoch_str: str = config.get_epoch_str_function(epoch)
-        log_array_path: str = save_directory + os.sep + config.loss_file.get_full_name(suffix=epoch_str)
-        model_file_name: str = config.model_file.get_full_name(suffix=epoch_str)
-        model_path: str = save_directory + os.sep + model_file_name
+        log_array_path: str = directory + os.sep + config.loss_file.get_full_name(suffix=epoch_str)
+        model_path: str = directory + os.sep + config.model_file.get_full_name(suffix=epoch_str)
 
         # noinspection PyTypeChecker
         np.savetxt(log_array_path, loss_array, fmt="%.18e", delimiter=",")

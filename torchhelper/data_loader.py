@@ -7,7 +7,7 @@ class PreSampledBatchSampler(BatchSampler):
 
     def __init__(self, sampler, batch_size, drop_last):
         super(PreSampledBatchSampler, self).__init__(sampler=sampler, batch_size=batch_size, drop_last=drop_last)
-        self.pre_sampled: Tuple[List[Any]] = tuple(_iterate_batch(sampler, batch_size, drop_last))
+        self.pre_sampled: Tuple[List[Any], ...] = tuple(_iterate_batch(sampler, batch_size, drop_last))
 
     def __iter__(self):
         for batch in self.pre_sampled:

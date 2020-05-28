@@ -25,7 +25,7 @@ class Writer:
         self._file: str = file
         self._closed: bool = True
         self._position: int = 0
-        self._init_args: Tuple[Any] = args
+        self._init_args: Tuple[Any, ...] = args
         self._init_kwargs: Dict[str, Any] = kwargs
 
     # region Abstract Method

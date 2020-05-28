@@ -134,7 +134,7 @@ class Pitch:
     @classmethod
     def from_frequency(cls, value: Union[int, float, Iterable[int], Iterable[float], np.ndarray],
                        *, standard_pitch: float = consts.DEFAULT_STANDARD_PITCH) \
-            -> Union[_pitch, Tuple[_pitch], Set[_pitch], List[_pitch], np.ndarray]:
+            -> Union[_pitch, Tuple[_pitch, ...], Set[_pitch], List[_pitch], np.ndarray]:
         if type(value) == int or type(value) == float:
             return Pitch._create_from_frequency(float(value), standard_pitch=standard_pitch)
         result: List[_pitch] = \
