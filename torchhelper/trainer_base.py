@@ -14,7 +14,7 @@ from optuna.trial import Trial
 import torch
 from torch.utils.data import DataLoader
 
-from .. import ConfigBase, UtilLogger
+from .. import ConfigBase, UtilLogger, is_debugging
 from ..torchhelper import OptunaParameter
 from ..visualizer import visualize_loss, visualize_values_for_each_epoch
 
@@ -197,33 +197,39 @@ class TrainerBase:
         # noinspection PyUnusedLocal
         data: DataTensorLike
 
+        debugging: bool = is_debugging()
+
         for data in data_loader:
 
             data_length: int = get_data_length(data)
             data_count += data_length
 
-            # noinspection PyUnusedLocal
-            result: TrainResult
-
-            if backpropagate:
-                with torch.autograd.detect_anomaly():
+            def _train_for_each_iteration() -> TrainResult:
+                if backpropagate:
                     model_set.optimizer.zero_grad()
                     result = cls.train_for_each_iteration(
                         model_set=model_set, data=data, backpropagate=backpropagate, logger=logger, **kwargs)
                     model_set.optimizer.step()
-            else:
-                with torch.no_grad():
-                    result = cls.train_for_each_iteration(
-                        model_set=model_set, data=data, backpropagate=backpropagate, logger=logger, **kwargs)
+                else:
+                    with torch.no_grad():
+                        result = cls.train_for_each_iteration(
+                            model_set=model_set, data=data, backpropagate=backpropagate, logger=logger, **kwargs)
+                return result
 
-            if issubclass(type(result.loss), int) or issubclass(type(result.loss), float):
-                loss_sum += result.loss * data_length
+            if debugging:
+                with torch.autograd.detect_anomaly():
+                    train_result: TrainResult = _train_for_each_iteration()
+            else:
+                train_result = _train_for_each_iteration()
+
+            if issubclass(type(train_result.loss), int) or issubclass(type(train_result.loss), float):
+                loss_sum += train_result.loss * data_length
             else:
                 raise NotImplementedError
 
             if is_output_progress:
                 score: Optional[ScoreLike] = cls.score_for_each_iteration(
-                        model_set=model_set, data=data, train_result=result, logger=logger, **kwargs)
+                        model_set=model_set, data=data, train_result=train_result, logger=logger, **kwargs)
                 if score is None:
                     score_sum = None
                 elif issubclass(type(score), int) or issubclass(type(score), float):
@@ -327,8 +333,9 @@ class TrainerBase:
                            fmt=fmt_base, delimiter=",")
 
             # params.json5
-            with open(config.result_directory + os.sep + config.optuna_params_file.full_name, "w") as f:
-                json5.dump(trial.params, f)
+            if trial is not None:
+                with open(config.result_directory + os.sep + config.optuna_params_file.full_name, "w") as f:
+                    json5.dump(trial.params, f)
 
             # loss.png
             visualize_loss(train_log.loss_array, train_log.data_keys, directory=config.result_directory,

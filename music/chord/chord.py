@@ -286,7 +286,7 @@ class Chord(MutableMapping):
         prior_interval = prior_interval or {}
 
         composed_root: NoteLike = composed.get(1, None)
-        if type(composed_root) == Interval and composed_root is not Interval.P1:
+        if type(composed_root) == Interval and composed_root != Interval.P1:
             raise CollideNoteError
         composed_root_note: Optional[Note] = None
         if type(composed_root) == str and not str.isspace(composed_root):
