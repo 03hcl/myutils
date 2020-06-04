@@ -20,6 +20,12 @@ class UtilLogger:
         os.makedirs(self.interim_directory, exist_ok=True)
         self.time_meter: TimeMeter = TimeMeter()
 
+        self.debug("UtilLogger を作成しました。次のファイルに記録されます。")
+        for handler in self.base_logger.handlers:
+            if issubclass(type(handler), FileHandler):
+                file_handler: FileHandler = handler
+                self.debug(file_handler.baseFilename)
+
     # region logger-like Method
 
     def close(self) -> None:
