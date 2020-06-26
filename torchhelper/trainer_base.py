@@ -56,7 +56,8 @@ class TrainerBase:
     # noinspection PyUnusedLocal
     @classmethod
     def output_progress(cls, config: ConfigBase, epoch: int, model_set: ModelSet,
-                        epoch_result_dict: Dict[str, EpochResult], train_keys: Tuple[str, ...],
+                        epoch_result_dict: Dict[str, EpochResult],
+                        train_keys: Tuple[str, ...], validation_keys: Tuple[str, ...],
                         loss_array: np.ndarray, score_array: Optional[np.ndarray] = None,
                         visualizes_loss_on_logscale: bool = False, *, logger: UtilLogger, **kwargs) -> None:
         score: Optional[float] = calculate_score_sum(train_keys, epoch_result_dict)
@@ -75,9 +76,8 @@ class TrainerBase:
 
     # noinspection PyUnusedLocal
     @classmethod
-    def calculate_optuna_score(cls, train_keys: Tuple[str, ...], epoch_result_dict: Dict[str, EpochResult],
-                               *, logger: UtilLogger, **kwargs) -> float:
-        validation_keys: Tuple[str, ...] = tuple(key for key in epoch_result_dict.keys() if key not in train_keys)
+    def calculate_score(cls, train_keys: Tuple[str, ...], validation_keys: Tuple[str, ...],
+                        epoch_result_dict: Dict[str, EpochResult], *, logger: UtilLogger, **kwargs) -> float:
         return calculate_loss_sum(train_keys if len(validation_keys) == 0 else validation_keys, epoch_result_dict)
 
     @classmethod
@@ -86,20 +86,30 @@ class TrainerBase:
               visualizes_loss_on_logscale: bool = False,
               *, logger: UtilLogger, trial: Optional[Trial] = None, **kwargs) -> TrainLog:
 
+        best_model_path: str = config.interim_directory + os.sep + config.model_file.full_name
         pre_epoch: int = config.train.pre_epoch or 0
+
+        # region data_loader_dict の作成
 
         data_loader_like: DataLoaderLike = \
             cls.create_data_loader(config=config, dataset=train_dataset, logger=logger, **kwargs)
         data_loader_dict: Dict[str, DataLoader] = \
             create_data_loader_dict(data_loader_like, create_key_str(TRAIN_KEY_STR))
+
         train_keys: Tuple[str, ...] = tuple(data_loader_dict.keys())
+        validation_keys: Tuple[str, ...] = tuple()
 
         if validation_dataset is not None:
-            data_loader_like = \
+            validation_data_loader_like: DataLoaderLike = \
                 cls.create_data_loader(config=config, dataset=validation_dataset, logger=logger, **kwargs)
-            data_loader_dict.update(create_data_loader_dict(data_loader_like, create_key_str(VALIDATION_KEY_STR)))
+            validation_data_loader_dict: Dict[str, DataLoader] = \
+                create_data_loader_dict(validation_data_loader_like, create_key_str(VALIDATION_KEY_STR))
+            validation_keys = tuple(validation_data_loader_dict.keys())
+            data_loader_dict.update(validation_data_loader_dict)
 
         data_loader_length: int = len(data_loader_dict)
+
+        # endregion
 
         loss_array_length: int = \
             int(config.train.number_of_epochs / config.train.progress_epoch) \
@@ -110,12 +120,15 @@ class TrainerBase:
 
         optuna_score_array: np.ndarray = np.zeros((config.train.number_of_epochs - pre_epoch, 2))
 
-        logger.time_meter.set_start_time()
+        latest_score: float = np.inf
+        optuna_latest_score: float = np.inf
 
         # noinspection PyUnusedLocal
         result_dict: Dict[str, EpochResult] = dict()
         # noinspection PyUnusedLocal
         epoch: int
+
+        logger.time_meter.set_start_time()
 
         for epoch in range(pre_epoch, config.train.number_of_epochs):
 
@@ -143,6 +156,8 @@ class TrainerBase:
                 has_score |= result.score is not None
                 result_dict[key] = EpochResult(data_loader, result.data_count, result.loss, result.score)
 
+            score: float = cls.calculate_score(train_keys, validation_keys, result_dict, logger=logger)
+
             if is_output_progress:
                 loss_array[loss_index, :] = [epoch + 1, *(e.loss for e in result_dict.values())]
                 if has_score:
@@ -150,20 +165,25 @@ class TrainerBase:
                 loss_index += 1
                 cls.output_progress(
                     config=config, epoch=epoch + 1,
-                    model_set=model_set, epoch_result_dict=result_dict, train_keys=train_keys,
+                    model_set=model_set, epoch_result_dict=result_dict,
+                    train_keys=train_keys, validation_keys=validation_keys,
                     loss_array=loss_array[: loss_index], score_array=score_array[: loss_index] if has_score else None,
                     visualizes_loss_on_logscale=visualizes_loss_on_logscale,
                     logger=logger, **kwargs)
+                if score < latest_score:
+                    latest_score = score
+                    torch.save(model_set.model.state_dict(), best_model_path)
+                    logger.info("モデル保存: path = {}".format(best_model_path))
 
             if config.train.temporary_save_epoch > 0 and (epoch + 1) % config.train.temporary_save_epoch == 0:
                 logger.save_loss_array_and_model(config, epoch + 1, loss_array[0: loss_index, :], model_set.model,
                                                  trial=trial)
 
             if config.train.optuna_pruner is not None and trial is not None:
-                score: float = cls.calculate_optuna_score(train_keys, result_dict, logger=logger)
+                optuna_latest_score = min(optuna_latest_score, score)
                 trial.report(score, epoch + 1)
                 optuna_score_array[epoch - pre_epoch, 0] = epoch + 1
-                optuna_score_array[epoch - pre_epoch, 1] = score
+                optuna_score_array[epoch - pre_epoch, 1] = optuna_latest_score
                 if trial.should_prune(epoch + 1):
                     logger.info("epoch = {:>5},    loss = {:>10.6f},    [Pruned]".format(epoch + 1, score))
                     # noinspection PyTypeChecker
@@ -172,13 +192,19 @@ class TrainerBase:
                                optuna_score_array[: epoch - pre_epoch], fmt=["%.0f", "%.18e"], delimiter=",")
                     raise TrialPruned
 
-        # noinspection PyTypeChecker
-        np.savetxt(config.result_directory + os.sep + config.optuna_score_file.full_name, optuna_score_array,
-                   # fmt="%.18e", delimiter=",")
-                   fmt=["%.0f", "%.18e"], delimiter=",")
+        if trial is not None:
+            # noinspection PyTypeChecker
+            np.savetxt(config.result_directory + os.sep + config.optuna_score_file.full_name, optuna_score_array,
+                       # fmt="%.18e", delimiter=",")
+                       fmt=["%.0f", "%.18e"], delimiter=",")
 
-        return TrainLog(tuple(data_loader_dict.keys()), loss_array, score_array,
-                        cls.calculate_optuna_score(train_keys, result_dict, logger=logger))
+        score = cls.calculate_score(train_keys, validation_keys, result_dict, logger=logger)
+        if score < latest_score:
+            latest_score = score
+            torch.save(model_set.model.state_dict(), best_model_path)
+            logger.info("モデル保存: path = {}".format(best_model_path))
+
+        return TrainLog(tuple(data_loader_dict.keys()), loss_array, score_array, latest_score)
 
     @classmethod
     def _train_for_each_data_loader(cls, model_set: ModelSet, data_loader: DataLoader,
@@ -319,7 +345,9 @@ class TrainerBase:
             util_logger.debug("結果を保存します。(ディレクトリ = {})".format(config.result_directory))
 
             # model.pth
-            torch.save(model_set.model.state_dict(), config.result_directory + os.sep + config.model_file.full_name)
+            shutil.copy(config.interim_directory + os.sep + config.model_file.full_name,
+                        config.result_directory + os.sep + config.model_file.full_name)
+            # torch.save(model_set.model.state_dict(), config.result_directory + os.sep + config.model_file.full_name)
 
             # loss.csv, score.csv
             fmt_base: List[str] = ["%.0f"]

@@ -57,7 +57,6 @@ class Writer:
         for frame in iterator:
             self.write_frame(frame)
 
-
     # region Special Method
 
     def __enter__(self) -> _writer:
