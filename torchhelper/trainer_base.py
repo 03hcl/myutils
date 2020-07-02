@@ -91,19 +91,14 @@ class TrainerBase:
 
         # region data_loader_dict の作成
 
-        data_loader_like: DataLoaderLike = \
-            cls.create_data_loader(config=config, dataset=train_dataset, logger=logger, **kwargs)
-        data_loader_dict: Dict[str, DataLoader] = \
-            create_data_loader_dict(data_loader_like, create_key_str(TRAIN_KEY_STR))
-
+        data_loader_dict: Dict[str, DataLoader] = cls._create_data_loader_dict(
+            config=config, dataset=train_dataset, key_str=TRAIN_KEY_STR, logger=logger)
         train_keys: Tuple[str, ...] = tuple(data_loader_dict.keys())
         validation_keys: Tuple[str, ...] = tuple()
 
         if validation_dataset is not None:
-            validation_data_loader_like: DataLoaderLike = \
-                cls.create_data_loader(config=config, dataset=validation_dataset, logger=logger, **kwargs)
-            validation_data_loader_dict: Dict[str, DataLoader] = \
-                create_data_loader_dict(validation_data_loader_like, create_key_str(VALIDATION_KEY_STR))
+            validation_data_loader_dict: Dict[str, DataLoader] = cls._create_data_loader_dict(
+                config=config, dataset=validation_dataset, key_str=VALIDATION_KEY_STR, logger=logger)
             validation_keys = tuple(validation_data_loader_dict.keys())
             data_loader_dict.update(validation_data_loader_dict)
 
@@ -205,6 +200,14 @@ class TrainerBase:
             logger.info("モデル保存: path = {}".format(best_model_path))
 
         return TrainLog(tuple(data_loader_dict.keys()), loss_array, score_array, latest_score)
+
+    @classmethod
+    def _create_data_loader_dict(cls, config: ConfigBase, dataset: DatasetLike, key_str: str,
+                                 *, logger: UtilLogger, **kwargs) \
+            -> Dict[str, DataLoader]:
+        return create_data_loader_dict(
+            cls.create_data_loader(config=config, dataset=dataset, logger=logger, **kwargs),
+            create_key_str(key_str))
 
     @classmethod
     def _train_for_each_data_loader(cls, model_set: ModelSet, data_loader: DataLoader,
@@ -370,7 +373,7 @@ class TrainerBase:
                            pre_epoch=config.train.pre_epoch, is_logscale=visualizes_loss_on_logscale)
 
             cls.run_append(config=config, model_set=model_set, result_directory=config.result_directory,
-                           dataset=train_dataset, validation_dataset=validation_dataset, train_log=train_log,
+                           train_dataset=train_dataset, validation_dataset=validation_dataset, train_log=train_log,
                            device=device, logger=logger)
 
             config.interim_directory = base_interim_directory
@@ -412,7 +415,7 @@ class TrainerBase:
 
     @classmethod
     def run_append(cls, config: ConfigBase, model_set: ModelSet, result_directory: str,
-                   dataset: DatasetLike, validation_dataset: Optional[DatasetLike], train_log: TrainLog,
+                   train_dataset: DatasetLike, validation_dataset: Optional[DatasetLike], train_log: TrainLog,
                    *, device: Optional[Device] = None, logger: Optional[UtilLogger] = None, **kwargs) -> None:
         pass
 

@@ -24,7 +24,8 @@ def create_data_loader_dict(data_loader_like: DataLoaderLike, key_str_func: Call
 
 
 def create_key_str(base: str) -> Callable[[str], str]:
-    return lambda key: base + (" ({})".format(key) if key else "")
+    return lambda key: base + ("_{}".format(key) if key else "")
+    # return lambda key: base + (" ({})".format(key) if key else "")
 
 
 def get_data_length(data: Any) -> int:

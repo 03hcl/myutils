@@ -81,6 +81,10 @@ class ConfigBase:
         self.loss_file: FileName = FileName("loss", "csv")
         self.score_file: FileName = FileName("score", "csv")
 
+        self.train_file: FileName = FileName("train", "pth")
+        self.validation_file: FileName = FileName("validation", "pth")
+        self.test_file: FileName = FileName("test", "pth")
+
         self.optuna_score_file: FileName = FileName("optuna_score", "csv")
         self.optuna_params_file: FileName = FileName("optuna_params", "json5")
 
