@@ -1,7 +1,7 @@
 from typing import Dict, Iterable, Union
 
 import torch
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, TensorDataset
 
 
 DataTensorLike: type = Union[torch.Tensor, Iterable[torch.Tensor], Dict[str, torch.Tensor]]
@@ -12,6 +12,8 @@ Score: type = Union[NumericScore, torch.Tensor]
 ScoreDict: type = Union[Dict[str, int], Dict[str, float], Dict[str, bool]]
 ScoreIterable: type = Union[Iterable[int], Iterable[float], Iterable[bool]]
 ScoreLike: type = Union[NumericScore, ScoreIterable, ScoreDict, DataTensorLike]
+
+TensorDatasetLike: type = Union[TensorDataset, Iterable[TensorDataset], Dict[str, TensorDataset]]
 
 TRAIN_KEY_STR: str = "train"
 VALIDATION_KEY_STR: str = "val"
