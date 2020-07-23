@@ -1,19 +1,19 @@
-from typing import Dict, Iterable, Union
+from typing import Mapping, Sequence, Union
 
 import torch
-from torch.utils.data import DataLoader, Dataset, TensorDataset
+from torch.utils.data import DataLoader, Dataset    # , TensorDataset
 
 
-DataTensorLike: type = Union[torch.Tensor, Iterable[torch.Tensor], Dict[str, torch.Tensor]]
-DatasetLike: type = Union[Dataset, Iterable[Dataset], Dict[str, Dataset]]
-DataLoaderLike: type = Union[DataLoader, Iterable[DataLoader], Dict[str, DataLoader]]
+DataTensorLike: type = Union[torch.Tensor, Sequence[torch.Tensor], Mapping[str, torch.Tensor]]
+DatasetLike: type = Union[Dataset, Sequence[Dataset], Mapping[str, Dataset]]
+DataLoaderLike: type = Union[DataLoader, Sequence[DataLoader], Mapping[str, DataLoader]]
 NumericScore: type = Union[int, float, bool]
 Score: type = Union[NumericScore, torch.Tensor]
-ScoreDict: type = Union[Dict[str, int], Dict[str, float], Dict[str, bool]]
-ScoreIterable: type = Union[Iterable[int], Iterable[float], Iterable[bool]]
-ScoreLike: type = Union[NumericScore, ScoreIterable, ScoreDict, DataTensorLike]
+ScoreMapping: type = Union[Mapping[str, int], Mapping[str, float], Mapping[str, bool]]
+ScoreSequence: type = Union[Sequence[int], Sequence[float], Sequence[bool]]
+ScoreLike: type = Union[NumericScore, ScoreSequence, ScoreMapping, DataTensorLike]
 
-TensorDatasetLike: type = Union[TensorDataset, Iterable[TensorDataset], Dict[str, TensorDataset]]
+# TensorDatasetLike: type = Union[TensorDataset, Sequence[TensorDataset], Mapping[str, TensorDataset]]
 
 TRAIN_KEY_STR: str = "train"
 VALIDATION_KEY_STR: str = "val"

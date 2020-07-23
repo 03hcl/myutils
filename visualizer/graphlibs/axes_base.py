@@ -114,15 +114,15 @@ class Axes(GraphBase):
                     data: Union[np.ndarray, Iterable[np.ndarray]]) -> Optional[Tuple[float, float]]:
         if value is None:
             return None
-        data_min: float = (min(data) if issubclass(type(data), np.ndarray) else min(min(d) for d in data)) \
+        data_min: float = (min(data) if isinstance(data, np.ndarray) else min(min(d) for d in data)) \
             if value[0] is None else value[0]
-        data_max: float = (max(data) if issubclass(type(data), np.ndarray) else max(max(d) for d in data)) \
+        data_max: float = (max(data) if isinstance(data, np.ndarray) else max(max(d) for d in data)) \
             if value[1] is None else value[1]
         return data_min, data_max
 
     @staticmethod
     def _create_x(y: Union[np.ndarray, List[np.ndarray]]) -> np.ndarray:
-        length: int = len(y) if issubclass(type(y), np.ndarray) else max(len(y_i) for y_i in y)
+        length: int = len(y) if isinstance(y, np.ndarray) else max(len(y_i) for y_i in y)
         return np.arange(0, length)
 
 

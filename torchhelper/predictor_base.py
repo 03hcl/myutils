@@ -1,5 +1,5 @@
 from logging import Logger
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Mapping, Optional, Sequence, Union
 
 import torch
 from torch.utils.data import DataLoader
@@ -114,14 +114,12 @@ class PredictorBase:
 
 
 def _concat_batch(base: DataTensorLike, appended: Union[DataTensorLike], data_length: int) -> DataTensorLike:
-    if issubclass(type(appended), torch.Tensor):
+    if isinstance(appended, torch.Tensor):
         return _cat_or_sum(base, appended, data_length)
-    if issubclass(type(appended), tuple) or issubclass(type(appended), list) or issubclass(type(appended), set):
+    if isinstance(appended, Sequence):
         return tuple(_cat_or_sum(b, a, data_length) for b, a in zip(base, appended))
-    if issubclass(type(appended), dict):
-        for k, v in appended.items():
-            base[k] = _cat_or_sum(base[k], v, data_length)
-        return base
+    if isinstance(appended, Mapping):
+        return {k: _cat_or_sum(base[k], v, data_length) for k, v in appended.items()}
     raise TypeError
 
 
@@ -132,14 +130,14 @@ def _cat_or_sum(base: torch.Tensor, appended: torch.Tensor, data_length: int) ->
 
 
 def _mean_batch(output: DataTensorLike, data_length: int) -> DataTensorLike:
-    if issubclass(type(output), torch.Tensor):
+    if isinstance(output, torch.Tensor):
         return output / data_length if output.dim() == 0 else output
-    if issubclass(type(output), tuple) or issubclass(type(output), list) or issubclass(type(output), set):
+    if isinstance(output, Sequence):
         for o in output:
             if o.dim() == 0:
                 o /= data_length
         return output
-    if issubclass(type(output), dict):
+    if isinstance(output, Mapping):
         for o in output.values():
             if o.dim() == 0:
                 o /= data_length
@@ -148,14 +146,14 @@ def _mean_batch(output: DataTensorLike, data_length: int) -> DataTensorLike:
 
 
 def _init_batch(output: DataTensorLike, data_length: int) -> DataTensorLike:
-    if issubclass(type(output), torch.Tensor):
+    if isinstance(output, torch.Tensor):
         return output * data_length if output.dim() == 0 else output
-    if issubclass(type(output), tuple) or issubclass(type(output), list) or issubclass(type(output), set):
+    if isinstance(output, Sequence):
         for o in output:
             if o.dim() == 0:
                 o *= data_length
         return output
-    if issubclass(type(output), dict):
+    if isinstance(output, Mapping):
         for o in output.values():
             if o.dim() == 0:
                 o *= data_length

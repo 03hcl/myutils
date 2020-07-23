@@ -1,4 +1,4 @@
-from typing import Iterable, Optional, Tuple, Union
+from typing import Iterable, Optional, Sequence, Tuple, Union
 
 from cv2 import VideoWriter, VideoWriter_fourcc
 
@@ -38,10 +38,10 @@ class Writer(WriterBase):
 
 
 def _fourcc(value: Union[int, str, Iterable[str]]) -> int:
-    if issubclass(type(value), int):
+    if isinstance(value, int):
         return value
-    if issubclass(type(value), str):
+    if isinstance(value, str):
         return VideoWriter_fourcc(*value)
-    if issubclass(type(value), tuple) or issubclass(type(value), list):
+    if isinstance(value, Sequence):
         return VideoWriter_fourcc(*value)
     raise NotImplementedError

@@ -49,7 +49,7 @@ class Writer:
         # noinspection PyUnusedLocal
         iterator: Iterator[np.ndarray]
 
-        if issubclass(type(frames), np.ndarray):
+        if isinstance(frames, np.ndarray):
             iterator = iter(frames[i] for i in range(frames.shape[0]))
         else:
             iterator = iter(frames)

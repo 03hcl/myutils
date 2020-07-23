@@ -144,9 +144,9 @@ class TrainerBase:
                 result: TrainResultOfDataLoader = cls._train_for_each_data_loader(
                     model_set=model_set, data_loader=data_loader,
                     is_output_progress=is_output_progress, backpropagate=(key in train_keys), logger=logger, **kwargs)
-                if issubclass(type(result.loss), float):
+                if isinstance(result.loss, float):
                     result.loss /= result.data_count
-                if issubclass(type(result.score), float):
+                if isinstance(result.score, float):
                     result.score /= result.data_count
                 has_score |= result.score is not None
                 result_dict[key] = EpochResult(data_loader, result.data_count, result.loss, result.score)
@@ -251,7 +251,7 @@ class TrainerBase:
             else:
                 train_result = _train_for_each_iteration()
 
-            if issubclass(type(train_result.loss), int) or issubclass(type(train_result.loss), float):
+            if isinstance(train_result.loss, int) or isinstance(train_result.loss, float):
                 loss_sum += train_result.loss * data_length
             else:
                 raise NotImplementedError
@@ -261,10 +261,10 @@ class TrainerBase:
                         model_set=model_set, data=data, train_result=train_result, logger=logger, **kwargs)
                 if score is None:
                     score_sum = None
-                elif issubclass(type(score), int) or issubclass(type(score), float):
+                elif isinstance(score, int) or isinstance(score, float):
                     score_sum += score * data_length
-                elif issubclass(type(score), torch.Tensor):
-                    if issubclass(type(score_sum), torch.Tensor):
+                elif isinstance(score, torch.Tensor):
+                    if isinstance(score_sum, torch.Tensor):
                         score_sum = torch.cat((score_sum, score), dim=0)
                     else:
                         score_sum = score
@@ -322,7 +322,7 @@ class TrainerBase:
                                           config.model_set.criterion.parameters,
                                           config.model_set.optimizer.parameters]:
                         for key, param in origin_params.items():
-                            if issubclass(type(param), OptunaParameter):
+                            if isinstance(param, OptunaParameter):
                                 OptunaParameter(
                                     param.suggestion_type, param.name, actual_params[key], actual_params[key]
                                 ).get_optuna_parameter(trial)
@@ -391,9 +391,9 @@ class TrainerBase:
             util_logger.info("Best: Trial {:d} / Score = {:f}".format(study.best_trial.number + 1, study.best_value))
             util_logger.info("Parameters:")
             for name, value in study.best_params.items():
-                if issubclass(type(value), float):
+                if iisinstance(value, float):
                     util_logger.info("{} = {:e}".format(name, value))
-                elif issubclass(type(value), int):
+                elif isinstance(value, int):
                     util_logger.info("{} = {:d}".format(name, value))
                 else:
                     util_logger.info("{} = {}".format(name, str(value)))

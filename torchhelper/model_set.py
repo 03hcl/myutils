@@ -60,7 +60,7 @@ def _suggest_parameters(parameters: Dict[str, Any], trial: Optional[Trial], conf
     result: Dict[str, Any] = {}
     params: Optional[Dict[str, Any]] = None
     for key, value in parameters.items():
-        if not issubclass(type(value), OptunaParameter):
+        if not isinstance(value, OptunaParameter):
             result[key] = value
         elif trial is not None:
             optuna_parameter: OptunaParameter = value

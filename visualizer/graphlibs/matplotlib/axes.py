@@ -104,7 +104,7 @@ class Axes(AxesBase):
             line_style: LineStyle = LineStyle.Solid, orientation: Orientation = Orientation.Vertical,
             **kwargs) -> None:
         data: List[np.ndarray] = \
-            [data[i] for i in range(0, data.shape[0])] if issubclass(type(data), np.ndarray) else list(data)
+            [data[i] for i in range(0, data.shape[0])] if isinstance(data, np.ndarray) else list(data)
         kwargs = Axes._add_label_to_kwargs(label, kwargs)
         self._raw.hist(x=data, bins=bins, range=Axes._data_range(data_range, data),
                        linestyle=line_style_to_str(line_style), orientation=str(orientation), **kwargs)
@@ -127,7 +127,7 @@ class Axes(AxesBase):
                       label: Optional[Iterable[str]] = None, width: float = 0.9,
                       orientation: Orientation = Orientation.Vertical, **kwargs) -> None:
         x = Axes._create_x(y) if x is None else x
-        data: List[np.ndarray] = [y[i] for i in range(0, y.shape[0])] if issubclass(type(y), np.ndarray) else list(y)
+        data: List[np.ndarray] = [y[i] for i in range(0, y.shape[0])] if isinstance(y, np.ndarray) else list(y)
         each_width: float = width / len(data)
         for i, (y_i, l_i) in enumerate(zip(data, label)):
             kwargs_i = Axes._add_label_to_kwargs(l_i, kwargs)

@@ -22,7 +22,7 @@ class UtilLogger:
 
         self.debug("UtilLogger を作成しました。次のファイルに記録されます。")
         for handler in self.base_logger.handlers:
-            if issubclass(type(handler), FileHandler):
+            if isinstance(handler, FileHandler):
                 file_handler: FileHandler = handler
                 self.debug(file_handler.baseFilename)
 
@@ -151,3 +151,24 @@ class BlankUtilLogger(UtilLogger):
 
     def critical(self, msg: str = "", *args, **kwargs) -> None:
         print(msg)
+
+
+# class NoneUtilLogger:
+#
+#     def close(self) -> None:
+#         pass
+#
+#     def debug(self, msg: str = "", *args, **kwargs) -> None:
+#         pass
+#
+#     def info(self, msg: str = "", *args, **kwargs) -> None:
+#         pass
+#
+#     def warning(self, msg: str = "", *args, **kwargs) -> None:
+#         pass
+#
+#     def error(self, msg: str = "", *args, **kwargs) -> None:
+#         pass
+#
+#     def critical(self, msg: str = "", *args, **kwargs) -> None:
+#         pass
