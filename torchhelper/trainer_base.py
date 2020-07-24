@@ -391,7 +391,7 @@ class TrainerBase:
             util_logger.info("Best: Trial {:d} / Score = {:f}".format(study.best_trial.number + 1, study.best_value))
             util_logger.info("Parameters:")
             for name, value in study.best_params.items():
-                if iisinstance(value, float):
+                if isinstance(value, float):
                     util_logger.info("{} = {:e}".format(name, value))
                 elif isinstance(value, int):
                     util_logger.info("{} = {:d}".format(name, value))

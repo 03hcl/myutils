@@ -19,7 +19,7 @@ class FileName:
                 raise FileNameArgumentsError
             name_pair: Tuple[str, str] = splitext(split(full_name)[1])
             self.name_without_ext = name_pair[0]
-            self.ext = name_pair[0].replace(os.extsep, "", count=1)
+            self.ext = name_pair[1].replace(os.extsep, "", 1)
         else:
             self.name_without_ext = name_without_ext
             self.ext = ext

@@ -37,22 +37,25 @@ def split_and_save_dataset(config: ConfigBase, base_dataset: DatasetLike,
     validation_length: int = int((length - test_length) * validation_rate)
     train_length: int = length - (test_length + validation_length)
 
-    logger.debug("Train Dataset を保存します。")
-    _save_dataset(base_dataset, shuffled[: train_length],
-                  config.processed_data_directory, config.train_file, file_batch_size, logger)
+    if logger:
+        logger.debug("Train Dataset を保存します。")
+    save_separated_dataset(base_dataset, shuffled[: train_length],
+                           config.processed_data_directory, config.train_file, file_batch_size, logger)
     offset: int = train_length
-    logger.debug("Validation Dataset を保存します。")
-    _save_dataset(base_dataset, shuffled[offset: offset + validation_length],
-                  config.processed_data_directory, config.validation_file, file_batch_size, logger)
+    if logger:
+        logger.debug("Validation Dataset を保存します。")
+    save_separated_dataset(base_dataset, shuffled[offset: offset + validation_length],
+                           config.processed_data_directory, config.validation_file, file_batch_size, logger)
     offset += validation_length
-    logger.debug("Test Dataset を保存します。")
-    _save_dataset(base_dataset, shuffled[offset: offset + test_length],
-                  config.processed_data_directory, config.test_file, file_batch_size, logger)
+    if logger:
+        logger.debug("Test Dataset を保存します。")
+    save_separated_dataset(base_dataset, shuffled[offset: offset + test_length],
+                           config.processed_data_directory, config.test_file, file_batch_size, logger)
 
 
-def _save_dataset(base_dataset: DatasetLike, indices: torch.Tensor, directory: str, file_name: FileName,
-                  file_batch_size: Optional[int] = None,
-                  logger: UtilLogger = BlankUtilLogger) -> None:
+def save_separated_dataset(base_dataset: DatasetLike, indices: torch.Tensor, directory: str, file_name: FileName,
+                           file_batch_size: Optional[int] = None,
+                           logger: Optional[UtilLogger] = None) -> None:
 
     if indices.size(0) == 0:
         return
@@ -82,9 +85,10 @@ def _save_dataset(base_dataset: DatasetLike, indices: torch.Tensor, directory: s
             os.makedirs(directory + os.sep + file_name.name_without_ext, exist_ok=True)
         file_path: str = directory + os.sep + file_name.get_full_name(suffix=file_suffix)
         torch.save(dataset, file_path)
-        # logger.debug("(count = {}, length = {}, shape = {}, path = {})".format(
-        #     count + 1, length, str([t.shape for t in dataset.tensors]), file_path))
-        logger.debug("(shape = {}, path = {})".format(str([t.shape for t in dataset.tensors]), file_path))
+        if logger:
+            # logger.debug("(count = {}, length = {}, shape = {}, path = {})".format(
+            #     count + 1, length, str([t.shape for t in dataset.tensors]), file_path))
+            logger.debug("(shape = {}, path = {})".format(str([t.shape for t in dataset.tensors]), file_path))
         count += 1
 
 
