@@ -22,8 +22,11 @@ class _Data(ConstSingleton):
     BaseSuffixDict: Tuple[Symbol, ...] = \
         (
             Symbol("dim", {3: Interval.m3, 5: Interval.d5, 7: Interval.d7},
-                   decode={Notation.Standard, Notation.MIREX},
-                   encode={Notation.Standard, Notation.MIREX}),
+                   decode={Notation.Standard},
+                   encode={Notation.Standard}),
+            Symbol("dim", {3: Interval.m3, 5: Interval.d5, 7: Interval.d7}, {"dim7", },
+                   decode={Notation.MIREX},
+                   encode={Notation.MIREX}),
             Symbol("dim", {3: Interval.m3, 5: Interval.d5, 7: Interval.d7}, {"dim7", "0", "○", },
                    decode={Notation.Advanced},
                    encode={Notation.Advanced}),
@@ -89,8 +92,8 @@ class _Data(ConstSingleton):
                    decode={Notation.Standard, Notation.MIREX, Notation.Advanced},
                    encode={Notation.Standard, Notation.MIREX, Notation.Advanced}),
             Symbol("sus2", {3: Interval.M2},
-                   decode={Notation.Standard, Notation.Advanced},
-                   encode={Notation.Standard, Notation.Advanced}),
+                   decode={Notation.Standard, Notation.MIREX, Notation.Advanced},
+                   encode={Notation.Standard, Notation.MIREX, Notation.Advanced}),
 
             Symbol("add9", {5: Interval.P5, 7: None, 9: Interval.M9},
                    decode={Notation.Standard, Notation.MIREX, Notation.Advanced},
@@ -131,21 +134,45 @@ class _Data(ConstSingleton):
 
     TensionSuffixDict: Tuple[Symbol, ...] = \
         (
+            Symbol("1", {3: None, 5: None, 7: None},
+                   excepted={"11", "13", }, enforced=True,
+                   decode={Notation.MIREX},
+                   encode={Notation.MIREX}),
+
+            Symbol("2", {9: Interval.M9},
+                   decode={Notation.MIREX},
+                   encode={Notation.MIREX}),
+
+            Symbol("*3", {3: None}, {"*b3", }, enforced=True,
+                   decode={Notation.MIREX},
+                   encode={Notation.MIREX}),
             Symbol("4", {3: Interval.P4}, enforced=True,
                    decode={Notation.MIREX},
                    encode={Notation.MIREX}),
+
             Symbol("-5", {5: Interval.d5}, {"b5", "♭5", },
                    decode={Notation.Standard, Notation.MIREX, Notation.Advanced},
                    encode={Notation.Standard, Notation.MIREX, Notation.Advanced}),
+            Symbol("5", {5: Interval.P5}, enforced=True,
+                   decode={Notation.MIREX},
+                   encode={Notation.MIREX}),
             Symbol("+5", {5: Interval.A5}, {"#5", "♯5", },
                    decode={Notation.Standard, Notation.MIREX, Notation.Advanced},
                    encode={Notation.Standard, Notation.MIREX, Notation.Advanced}),
-            Symbol("b7", {7: Interval.m7}, {"♭7", },
+            Symbol("*5", {5: None}, {"*b5", "*#5", }, enforced=True,
                    decode={Notation.MIREX},
                    encode={Notation.MIREX}),
-            Symbol("7", {7: Interval.M7},
+
+            Symbol("b7", {7: Interval.m7}, {"♭7", }, enforced=True,
                    decode={Notation.MIREX},
                    encode={Notation.MIREX}),
+            Symbol("7", {7: Interval.M7}, enforced=True,
+                   decode={Notation.MIREX},
+                   encode={Notation.MIREX}),
+            Symbol("*7", {7: None}, enforced=True,
+                   decode={Notation.MIREX},
+                   encode={Notation.MIREX}),
+
             Symbol("b9", {9: Interval.m9}, {"♭9", },
                    decode={Notation.Standard},
                    encode={Notation.Standard}),
@@ -188,22 +215,6 @@ class _Data(ConstSingleton):
             Symbol("13", {13: Interval.M13}, {"♮13", "6", "♮6", },
                    decode={Notation.MIREX, Notation.Advanced},
                    encode={Notation.MIREX, Notation.Advanced}),
-
-            Symbol("*3", {3: None}, enforced=True,
-                   decode={Notation.MIREX},
-                   encode={Notation.MIREX}),
-            Symbol("*5", {5: None}, enforced=True,
-                   decode={Notation.MIREX},
-                   encode={Notation.MIREX}),
-            Symbol("*7", {7: None}, enforced=True,
-                   decode={Notation.MIREX},
-                   encode={Notation.MIREX}),
-            Symbol("1", {3: None, 5: None, 7: None, 9: None, 11: None, 13: None}, enforced=True,
-                   decode={Notation.MIREX},
-                   encode={Notation.MIREX}),
-            Symbol("5", {5: Interval.P5}, enforced=True,
-                   decode={Notation.MIREX},
-                   encode={Notation.MIREX}),
         )
 
     TensionParenthesesDict: Dict[Notation, Tuple[Tuple[str, str]]] = \
@@ -258,23 +269,43 @@ class Interpreter:
                 else:
                     return NoneChord
 
-        bass: Optional[str] = None
-        root: Optional[Note] = None
-        chord: str = ""
-        tension: str = ""
+        bass, chord = cls._divide_bass_and_chord(value=value, notation=notation)
+        root, chord = cls._divide_root_and_chord(value=chord, notation=notation, language=language)
+        chord, tension = cls._divide_chord_and_tension(value=chord, notation=notation)
 
-        # region Divide bass string
+        chord_dict, altered_3rd, altered_5th = cls._interpret_chord(
+            chord=chord, chord_dict={3: Interval.M3, 5: Interval.P5}, notation=notation)
+        chord_dict: Dict[int, Optional[Interval]] = cls._interpret_tension(
+            tension=tension, chord_dict=chord_dict, altered_3rd=altered_3rd, altered_5th=altered_5th, notation=notation)
 
+        # if chord_dict.get(7, None) == Interval.A7:
+        #     chord_dict[7] = None
+        # if chord_dict.get(9, None) == Interval.d9:
+        #     chord_dict[9] = None
+
+        created_chord: Chord = Chord.from_dict(chord_dict, root_note=root,
+                                               omits_root=chord_dict.get(1, Interval.P1) is None, language=language)
+
+        # created_chord: Chord = Chord(root, chord_dict.get(3, None), chord_dict.get(5, None),
+        #                              chord_dict.get(7, None), chord_dict.get(9, None),
+        #                              chord_dict.get(11, None), chord_dict.get(13, None),
+        #                              omits_root=chord_dict.get(1, Interval.P1) is None, language=language)
+
+        if requires_bass:
+            return ChordWithBass(created_chord, bass, notation=notation, language=language)
+        else:
+            return created_chord
+
+    @classmethod
+    def _divide_bass_and_chord(cls, value: str, notation: Notation) -> Tuple[Optional[str], str]:
         for sep in DATA.BassSeparatorDict[notation]:
             index: int = value.find(sep)
             if index >= 0:
-                bass = value[index + len(sep):].lstrip()
-                value = value[:index].rstrip()
-                break
+                return value[index + len(sep):].lstrip(), value[:index].rstrip()
+        return None, value
 
-        # endregion
-
-        # region Divide root string
+    @classmethod
+    def _divide_root_and_chord(cls, value: str, notation: Notation, language: NoteLanguage) -> Tuple[Note, str]:
 
         tries_auto: bool = False
 
@@ -282,41 +313,34 @@ class Interpreter:
             if sep:
                 index: int = value.find(sep)
                 if index >= 0:
-                    root = Note.from_str(value[:index], language)
-                    chord = value[index + len(sep):].lstrip()
-                    break
+                    return Note.from_str(value[:index], language), value[index + len(sep):].lstrip()
             else:
                 tries_auto = True
 
-        if tries_auto and root is None:
+        if tries_auto:
             for index in reversed(range(len(value))):
                 try:
-                    root = Note.from_str(value[:index + 1], language)
-                    chord = value[index + 1:].lstrip()
-                    break
+                    return Note.from_str(value[:index + 1], language), value[index + 1:].lstrip()
                 except NotFoundNoteError:
                     pass
 
-        # endregion
+        raise CannotInterpretRootError
 
-        if root is None:
-            raise CannotInterpretRootError
-
-        # region Divide chord and tension string
-
+    @classmethod
+    def _divide_chord_and_tension(cls, value: str, notation: Notation) -> Tuple[str, str]:
         for l, r in DATA.TensionParenthesesDict[notation]:
-            l_index: int = chord.find(l)
-            r_index: int = chord.find(r)
+            l_index: int = value.find(l)
+            r_index: int = value.find(r)
             if 0 <= l_index < r_index:
-                tension = chord[l_index + len(l): r_index].lstrip()
-                chord = chord[:l_index].lstrip()
-                break
+                return value[:l_index].lstrip(), value[l_index + len(l): r_index].lstrip()
+        return value, ""
 
-        # endregion
+    @classmethod
+    def _interpret_chord(cls, chord: str, chord_dict: Dict[int, Optional[Interval]],
+                         notation: Notation) -> Tuple[Dict[int, Optional[Interval]], bool, bool]:
 
-        chord_dict: Dict[int, Optional[Interval]] = {3: Interval.M3, 5: Interval.P5}
-
-        # region Interpret chord
+        if not chord:
+            return chord_dict, False, False
 
         altered_3rd: bool = False
         altered_5th: bool = False
@@ -352,14 +376,16 @@ class Interpreter:
             altered_5th = altered_5th or 5 in symbol.intervals
 
             if not chord:
-                break
+                return chord_dict, altered_3rd, altered_5th
 
-        # endregion
+        raise CannotEncodeWholeChordStringError(chord)
 
-        if chord:
-            raise CannotEncodeWholeChordStringError(chord)
+    @classmethod
+    def _interpret_tension(cls, tension: str, chord_dict: Dict[int, Optional[Interval]],
+                           altered_3rd: bool, altered_5th: bool, notation: Notation) -> Dict[int, Optional[Interval]]:
 
-        # region Interpret tension
+        if not tension:
+            return chord_dict
 
         for symbol in DATA.TensionSuffixDict:
 
@@ -368,7 +394,7 @@ class Interpreter:
 
             excepted: bool = False
             for s in symbol.excepted:
-                if chord.startswith(s):
+                if tension.startswith(s):
                     excepted = True
                     break
             if excepted:
@@ -398,30 +424,9 @@ class Interpreter:
                     break
 
             if not tension:
-                break
+                return chord_dict
 
-        # endregion
-
-        if tension:
-            raise CannotEncodeWholeTensionStringError(tension)
-
-        # if chord_dict.get(7, None) == Interval.A7:
-        #     chord_dict[7] = None
-        # if chord_dict.get(9, None) == Interval.d9:
-        #     chord_dict[9] = None
-
-        created_chord: Chord = Chord.from_dict(chord_dict, root_note=root,
-                                               omits_root=chord_dict.get(1, Interval.P1) is None, language=language)
-
-        # created_chord: Chord = Chord(root, chord_dict.get(3, None), chord_dict.get(5, None),
-        #                              chord_dict.get(7, None), chord_dict.get(9, None),
-        #                              chord_dict.get(11, None), chord_dict.get(13, None),
-        #                              omits_root=chord_dict.get(1, Interval.P1) is None, language=language)
-
-        if requires_bass:
-            return ChordWithBass(created_chord, bass, notation=notation, language=language)
-        else:
-            return created_chord
+        raise CannotEncodeWholeTensionStringError(tension)
 
     @classmethod
     def encode_to_str(cls, value: Union[Chord, ChordWithBass], notation: Notation) -> str:
