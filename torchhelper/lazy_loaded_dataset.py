@@ -13,8 +13,8 @@ class LazyLoadedDataset(Dataset):
 
         super(LazyLoadedDataset, self).__init__()
 
-        if logger:
-            logger.info("LazyLoadedDataset を生成します。")
+        # if logger:
+        #     logger.info("LazyLoadedDataset を生成します。")
 
         self.file_path_list: Tuple[str, ...] = tuple(file_path_list)
         self.file_count: int = len(self.file_path_list)
