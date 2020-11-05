@@ -56,13 +56,14 @@ class PredictorBase:
         data_loader: DataLoader
 
         for key, data_loader in data_loader_dict.items():
-            output[key] = cls._predict_for_each_data_loader(data_loader=data_loader, model_set=model_set, logger=logger)
+            output[key] = cls._predict_for_each_data_loader(
+                data_loader=data_loader, model_set=model_set, logger=logger, **kwargs)
 
         return output
 
     @classmethod
-    def _predict_for_each_data_loader(cls, model_set: ModelSet, data_loader: DataLoader, *, logger: UtilLogger) \
-            -> DataTensorLike:
+    def _predict_for_each_data_loader(cls, model_set: ModelSet, data_loader: DataLoader,
+                                      *, logger: UtilLogger, **kwargs) -> DataTensorLike:
 
         data_count: int = 0
         output: Optional[DataTensorLike] = None
@@ -75,7 +76,7 @@ class PredictorBase:
             data_count += data_length
             with torch.no_grad():
                 batch_output: DataTensorLike = \
-                    cls.predict_for_each_iteration(model_set=model_set, data=data, logger=logger)
+                    cls.predict_for_each_iteration(model_set=model_set, data=data, logger=logger, **kwargs)
             output = _init_batch(batch_output, data_length) if output is None \
                 else _concat_batch(output, batch_output, data_length)
 
