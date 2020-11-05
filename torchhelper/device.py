@@ -73,5 +73,5 @@ class Device:
         return -1
 
 
-def adapt_tensor_to_device(tensor: torch.Tensor, device: Device):
+def adapt_tensor_to_device(tensor: torch.Tensor, device: Device) -> torch.Tensor:
     return tensor.to(device.torch_device) if device.is_gpu else tensor
