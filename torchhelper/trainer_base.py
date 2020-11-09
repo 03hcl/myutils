@@ -56,7 +56,7 @@ class TrainerBase:
     # noinspection PyUnusedLocal
     @classmethod
     def output_progress(cls, config: ConfigBase, epoch: int, model_set: ModelSet,
-                        epoch_result_dict: Dict[str, EpochResult],
+                        epoch_result_dict: Dict[str, EpochResult], data_loader_dict: Dict[str, DataLoader],
                         train_keys: Tuple[str, ...], validation_keys: Tuple[str, ...],
                         loss_array: np.ndarray, score_array: Optional[np.ndarray] = None,
                         visualizes_loss_on_logscale: bool = False, *, logger: UtilLogger, **kwargs) -> None:
@@ -143,7 +143,8 @@ class TrainerBase:
             for key, data_loader in data_loader_dict.items():
                 result: TrainResultOfDataLoader = cls._train_for_each_data_loader(
                     model_set=model_set, data_loader=data_loader,
-                    is_output_progress=is_output_progress, backpropagate=(key in train_keys), logger=logger, **kwargs)
+                    is_output_progress=is_output_progress, backpropagate=(key in train_keys), logger=logger, **kwargs,
+                    config=config, epoch=epoch + 1, data_loader_key=key)
                 if isinstance(result.loss, float):
                     result.loss /= result.data_count
                 if isinstance(result.score, float):
@@ -159,8 +160,8 @@ class TrainerBase:
                     score_array[loss_index, :] = [epoch + 1, *(e.score for e in result_dict.values())]
                 loss_index += 1
                 cls.output_progress(
-                    config=config, epoch=epoch + 1,
-                    model_set=model_set, epoch_result_dict=result_dict,
+                    config=config, epoch=epoch + 1, model_set=model_set,
+                    epoch_result_dict=result_dict, data_loader_dict=data_loader_dict,
                     train_keys=train_keys, validation_keys=validation_keys,
                     loss_array=loss_array[: loss_index], score_array=score_array[: loss_index] if has_score else None,
                     visualizes_loss_on_logscale=visualizes_loss_on_logscale,
