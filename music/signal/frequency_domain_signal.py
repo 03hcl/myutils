@@ -60,16 +60,12 @@ class FrequencyDomainSignalBase:
             pad_width = (pad_left, window_size - pad_left)
         padded: np.ndarray = self._raw if pad_width == (0, 0) \
             else np.pad(self._raw, [(0, 0), pad_width, (0, 0)], mode="constant").astype(dtype="<c8", order="C")
-        data_size = int((padded.shape[1] - window_size) / stride) + 1
-        return np.lib.stride_tricks.as_strided(padded,
-                                               shape=(padded.shape[0],
-                                                      data_size,
-                                                      window_size,
-                                                      self.number_of_frequencies),
-                                               strides=(padded.strides[0],
-                                                        padded.strides[1] * stride,
-                                                        padded.strides[1],
-                                                        padded.strides[2]))
+        data_size: int = int((padded.shape[1] - window_size) / stride) + 1
+        view: np.ndarray = np.lib.stride_tricks.as_strided(
+            padded,
+            shape=(padded.shape[0], data_size, window_size, self.number_of_frequencies),
+            strides=(padded.strides[0], padded.strides[1] * stride, padded.strides[1], padded.strides[2]))
+        return view
 
     @classmethod
     def _get_stride(cls, window_size: int, stride: int) -> int:
