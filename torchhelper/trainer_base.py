@@ -109,8 +109,9 @@ class TrainerBase:
         loss_array_length: int = \
             int(config.train.number_of_epochs / config.train.progress_epoch) \
             - int(max(pre_epoch, config.train.warmup_progress_epoch) / config.train.progress_epoch)
-        loss_array: np.ndarray = np.empty((loss_array_length, data_loader_length + 1))
-        score_array: np.ndarray = np.zeros((loss_array_length, data_loader_length + 1))
+        loss_or_score_shape: Tuple[int, int] = (loss_array_length, data_loader_length + 1)
+        loss_array: Optional[np.ndarray] = None
+        score_array: Optional[np.ndarray] = None
         loss_index: int = 0
 
         optuna_score_array: np.ndarray = np.zeros((config.train.number_of_epochs - pre_epoch, 2))
@@ -118,7 +119,6 @@ class TrainerBase:
         latest_score: float = np.inf
         optuna_latest_score: float = np.inf
 
-        # noinspection PyUnusedLocal
         result_dict: Dict[str, EpochResult] = dict()
         # noinspection PyUnusedLocal
         epoch: int
@@ -145,9 +145,9 @@ class TrainerBase:
                     model_set=model_set, data_loader=data_loader,
                     is_output_progress=is_output_progress, backpropagate=(key in train_keys), logger=logger, **kwargs,
                     config=config, epoch=epoch + 1, data_loader_key=key)
-                if isinstance(result.loss, float):
+                if _is_float_or_float_ndarray(result.loss):
                     result.loss /= result.data_count
-                if isinstance(result.score, float):
+                if _is_float_or_float_ndarray(result.score):
                     result.score /= result.data_count
                 has_score |= result.score is not None
                 result_dict[key] = EpochResult(data_loader, result.data_count, result.loss, result.score)
@@ -155,9 +155,11 @@ class TrainerBase:
             score: float = cls.calculate_score(train_keys, validation_keys, result_dict, logger=logger)
 
             if is_output_progress:
-                loss_array[loss_index, :] = [epoch + 1, *(e.loss for e in result_dict.values())]
+                loss_array = add_loss_or_score_to_array(loss_array, loss_or_score_shape, loss_index,
+                                                        epoch, *(e.loss for e in result_dict.values()))
                 if has_score:
-                    score_array[loss_index, :] = [epoch + 1, *(e.score for e in result_dict.values())]
+                    score_array = add_loss_or_score_to_array(score_array, loss_or_score_shape, loss_index,
+                                                             epoch, *(e.score for e in result_dict.values()))
                 loss_index += 1
                 cls.output_progress(
                     config=config, epoch=epoch + 1, model_set=model_set,
@@ -252,7 +254,7 @@ class TrainerBase:
             else:
                 train_result = _train_for_each_iteration()
 
-            if isinstance(train_result.loss, int) or isinstance(train_result.loss, float):
+            if isinstance(train_result.loss, (int, float, np.ndarray)):
                 loss_sum += train_result.loss * data_length
             else:
                 raise NotImplementedError
@@ -262,7 +264,7 @@ class TrainerBase:
                         model_set=model_set, data=data, train_result=train_result, logger=logger, **kwargs)
                 if score is None:
                     score_sum = None
-                elif isinstance(score, int) or isinstance(score, float):
+                elif isinstance(score, (int, float, np.ndarray)):
                     score_sum += score * data_length
                 elif isinstance(score, torch.Tensor):
                     if isinstance(score_sum, torch.Tensor):
@@ -357,7 +359,8 @@ class TrainerBase:
             fmt_base: List[str] = ["%.0f"]
             fmt_base.extend(["%.18e"] * (train_log.loss_array.shape[1] - 1))
             # noinspection PyTypeChecker
-            np.savetxt(config.result_directory + os.sep + config.loss_file.full_name, train_log.loss_array,
+            np.savetxt(config.result_directory + os.sep + config.loss_file.full_name,
+                       train_log.loss_array.reshape(*train_log.loss_array.shape[:2], -1)[:, :, 0],
                        fmt=fmt_base, delimiter=",")
             if np.any(train_log.score_array != 0):
                 # noinspection PyTypeChecker
@@ -370,7 +373,8 @@ class TrainerBase:
                     json5.dump(trial.params, f)
 
             # loss.png
-            visualize_loss(train_log.loss_array, train_log.data_keys, directory=config.result_directory,
+            visualize_loss(train_log.loss_array.reshape(*train_log.loss_array.shape[:2], -1)[:, :, 0],
+                           train_log.data_keys, directory=config.result_directory,
                            pre_epoch=config.train.pre_epoch, is_logscale=visualizes_loss_on_logscale)
 
             cls.run_append(config=config, model_set=model_set, result_directory=config.result_directory,
@@ -435,3 +439,26 @@ def calculate_score_sum(keys: Tuple[str, ...], epoch_result_dict: Dict[str, Epoc
     score_sum: float = sum(result.score * result.data_count for key, result in epoch_result_dict.items()
                            if ((key in keys) and (result.score is not None)))
     return score_sum / data_sum if data_sum > 0 else None
+
+
+def _is_float_or_float_ndarray(numeric_score: NumericScore):
+    if isinstance(numeric_score, float):
+        return True
+    elif isinstance(numeric_score, np.ndarray):
+        dtype = numeric_score.dtype
+        return dtype == np.float16 or dtype == np.float32 or dtype == np.float64
+    return False
+
+
+def add_loss_or_score_to_array(base_array: Optional[np.ndarray], size: Tuple[int, int], index: int,
+                               epoch: int, *element: Optional[NumericScore]) -> np.ndarray:
+    if not isinstance(element[0], np.ndarray):
+        if base_array is None:
+            base_array = np.zeros(size)
+        base_array[index, :] = [epoch + 1, *element]
+    else:
+        if base_array is None:
+            base_array = np.zeros((*size, *element[0].shape))
+        epoch_element = np.broadcast_to(epoch + 1, shape=element[0].shape)
+        base_array[index, :] = [epoch_element, *element]
+    return base_array

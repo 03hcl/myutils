@@ -8,4 +8,4 @@ from .data_aliases import DataTensorLike, ScoreLike
 class TrainResult:
     output: DataTensorLike
     loss: ScoreLike
-    target: Optional[DataTensorLike]
+    target: Optional[DataTensorLike] = None

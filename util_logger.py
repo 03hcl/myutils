@@ -95,7 +95,7 @@ class UtilLogger:
         model_path: str = directory + os.sep + config.model_file.get_full_name(suffix=epoch_str)
 
         # noinspection PyTypeChecker
-        np.savetxt(log_array_path, loss_array, fmt="%.18e", delimiter=",")
+        np.savetxt(log_array_path, loss_array.reshape(*loss_array.shape[:2], -1)[:, :, 0], fmt="%.18e", delimiter=",")
         torch.save(model.state_dict(), model_path)
         self.debug(log_str or "モデル保存: path = {}".format(model_path))
 
